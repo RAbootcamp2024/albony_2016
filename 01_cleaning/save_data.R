@@ -1,6 +1,6 @@
 ## データの読み込み
 
-pacman::p_load(tidyverse, haven,fastDummies)
+pacman::p_load(tidyverse, haven,fastDummies,fixest)
 
 df_house <- read_dta("replication_data/ipums2000h_wacw_albouy.dta")
 df_indvi_raw <- read_dta("replication_data/ipums2000p_wacw_albouy.dta")
@@ -115,7 +115,66 @@ df_indvi <-
 
 df_indvi_match <- 
   df_indvi %>% 
-  left_join(., df_match, by = c("statefip", "puma"))
+  left_join(df_match, ., by = c("statefip", "puma"))
+
+df_indvi_match <- 
+  df_indvi_match %>% 
+  mutate(oldperwt = perwt,
+         afact = pop/pumapop,
+         perwt = perwt*afact) %>% 
+  select(-c(pop, pumapop)) %>% 
+  filter(afact != 0) %>% 
+  relocate(year, statefip, puma, cmsa,
+           pmsa, afact, perwt, oldperwt) %>% 
+  mutate(across(c(starts_with("sch_"), starts_with("potexp"), 
+                  starts_with("expsch"), starts_with("ind_"),
+                  starts_with("occ_"), starts_with("vet"),
+                  starts_with("mar_"), starts_with("min_"),
+                  starts_with("im_"), starts_with("eng")),
+                ~ . * female, .names = "f_{col}"))
+
+
+# Regression --------------------------------------------------------------
+
+## NO CONTROL
+
+df_indvi_match_reg <- df_indvi_match %>% 
+  filter(perwt != 0)
+
+reg_nocontrol <- feols(lhrwage ~ female | cmsa,
+                       data = df_indvi_match_reg, 
+                       weights = ~perwt)
+
+w_raw <- fixef(reg_nocontrol)
+
+## WITH CONTROL
+controls <- df_indvi_match_reg %>% 
+  select(starts_with("sch_"), starts_with("potexp"), 
+         starts_with("expsch"), starts_with("ind_"),
+         starts_with("occ_"), starts_with("vet"),
+         starts_with("mar_"), starts_with("min_"),
+         starts_with("im_"), starts_with("eng"), 
+         starts_with("f_"), female) %>% 
+  colnames()
+
+formula <- as.formula(paste("lhrwage ~ ",
+                            paste(controls,collapse = "+"),
+                            "|cmsa"))
+
+reg_withcontrol <- feols(formula,
+                         data = df_indvi_match_reg, 
+                         weights = ~perwt)
+
+summary(reg_withcontrol)
+
+xb <- predict(reg_withcontrol,data=df_indvi_match_reg)
+w <- fixef(reg_withcontrol)
+lhrwage_r <- residuals(reg_withcontrol)
+
+df_indvi_match_reg <- df_indvi_match_reg %>% 
+  bind_cols(., w_raw, xb, w, lhrwage_r)
+
+## WEIGHTED WITH CONTROLS
 
 
   
