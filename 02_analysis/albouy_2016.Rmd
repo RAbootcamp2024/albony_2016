@@ -1,6 +1,10 @@
 ---
-title: "albouy2016"
-output: html_document
+title: "Albouy (2016) Replication"
+subtitle: "What Are Cities Worth? Land Rents, Local Productivity, and the Local Value of Amenities"
+output:
+  html_document:
+    css: styles.css
+    code_folding: hide
 date: "2024-08-30"
 ---
 
@@ -8,13 +12,48 @@ date: "2024-08-30"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+## 論文の概要
+
+### 目的
+- その地域（都市）における賃金と住宅価格に関するデータを用いて,不動産収入(land rent)や生産性(local productivity)、アメニティ(Amenity)を推定する。
+
+### 面白さ
+- 観察可能なデータから観察不可能な変数を見ようとしたところ
+
+### 使用データ
+- 2000年におけるIntergrated public use microdata series(IPUMS)
+
+
+
+
+
+
 ```{r}
-pacman::p_load(tidyverse, haven,fastDummies,fixest, plotly)
+pacman::p_load(tidyverse, haven,fastDummies,fixest, plotly,gt)
 
 df <- read_dta("replication_data/stcmsa2000_wacw_albouy.dta")
 ```
 
-## Figure 1 
+## やったこと
+### wage differentialのクリーニング・計算
+
+- **パッケージの効率的な読み込み**
+  - `pacman::p_load`を使用して、複数のパッケージを一度に読み込むことでコードを簡潔にし、パッケージの管理を一元化した。
+
+- **データのフィルタリングと変数変換**
+  - `dplyr`パイプラインを利用して、データのフィルタリングや変数変換を一連の処理として行い、コードの可読性とメンテナンス性を向上させた。
+
+- **ダミー変数の作成**
+  - `fastDummies`パッケージを使用して、カテゴリー別のダミー変数を効率的に生成した。
+
+- **回帰分析と固定効果分析**
+  - `fixest`パッケージを用いて、固定効果モデルを適用した。固定効果の係数が都市ごとの賃金の違いを表す。
+
+- **結果の保存と整理**
+  - 集約した結果を`saveRDS`でファイルに保存し、データの永続化と分析の再現性を確保した。
+
+### FigureとTableの作成{.tabset}
+#### Figure 1 
 Housing cost versus wage levels across metro areas, 2000
 
 ```{r}
@@ -32,22 +71,72 @@ figure1 <-
   df %>% 
   distinct(cmsa, .keep_all = T) %>% 
   ggplot(aes(x = w, y = p, text = shortname)) +
+  xlim(-0.4, 0.4) +
+  ylim(-0.6, 0.9) +
   geom_point(aes(size = size), alpha = 0.3) +
-  geom_abline(slope = 1.534,intercept = 0)+ 
+  geom_abline(slope = 1.534,intercept = 0, color="skyblue")+ 
   geom_abline(slope = 0.64,intercept = 0,linetype = "dashed")+
-  geom_abline(slope = -7.37,intercept = 0,linetype = "dotted")+
+  geom_abline(slope = -7.37,intercept = 0,linetype = "dotted", )+
   geom_abline(slope = -0.02,intercept = 0,linetype = "dotdash")+
-  geom_vline(xintercept = 0)+
-  geom_hline(yintercept = 0)+
-  labs(x="Log Wage Differential(w)",y="Log Housing-Cost Differential(p)")+
-  theme_bw()
+  geom_vline(xintercept = 0, color="gray")+
+  geom_hline(yintercept = 0, color="gray")+
+  labs(x="Log Wage Differential(w)",y="Log Housing-Cost Differential(p)",
+       size = "Scale of Population")+
+  theme_light()
   
-```
-```{r}
 ggplotly(figure1,
          tooltip = "text")
 ```
 
-##記述統計
+アメリカの各地域をそれぞれの点に取り、賃金 (w) と住宅コスト（p）の関係を示す。
+
+点の大きさは各地域の人口規模を表す。
+
+青線は平均的な生活の質を持つ都市を示す。青線より上側にある都市は、平均よりも非金銭的な生活の質が高く、下側の都市は平均よりも非金銭的な生活の質が低いと考えられる。
+
+#### Table 1
+```{r}
+
+phi_L <-0.233
+phi_N <- 0.617
+theta_L <- 0.025
+theta_N <- 0.825
+s_y <- 0.36
+s_r <-0.10
+s_w <- 0.75
+tau <- 0.361
+delta <- 0.291
+# tau_f <- 0.333
+# delta_f <- 0.257
+
+```
+
+Wage, Housing Cost, Land Rent, Quality-of-Life, Productivity, Federal Tax, and Total Amenity Value Differential
+```{r}
+df_table1 <- 
+  df %>% 
+  select(cmsaname,cmsapop,p,w) %>% 
+  mutate(r = (1/phi_L)*p - (phi_N/phi_L)*w,
+         A_x = (theta_L/phi_L)*p + (theta_N - phi_N * (theta_L/phi_L))*w,
+         Q = s_y * p - s_w *(1 - tau)*w,
+         federal_tax_payment = tau * s_w * w,
+         Total_Amenity_Value = s_r * r + federal_tax_payment) %>% 
+  arrange(desc(Total_Amenity_Value)) %>% 
+  mutate(across(-c(cmsaname, cmsapop), ~round(., 2)))
+  
+  
+
+df_table1 %>% 
+  gt()  %>% 
+  cols_label(cmsapop = "Population",
+             p = "Housing Costs (p)",
+             w = "Wages (w)",
+             r = "Inferred Land Rent (r)",
+             A_x = "Trade Productivity (A_x)",
+             Q = "Quality of Life (Q)", 
+             federal_tax_payment = "Federal Tax Payment",
+             Total_Amenity_Value = "Total Amenity Value")
+```
+
 
 
