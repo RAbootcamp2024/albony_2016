@@ -171,10 +171,76 @@ xb <- predict(reg_withcontrol,data=df_indvi_match_reg)
 w <- fixef(reg_withcontrol)
 lhrwage_r <- residuals(reg_withcontrol)
 
-df_indvi_match_reg <- df_indvi_match_reg %>% 
-  bind_cols(., w_raw, xb, w, lhrwage_r)
+df_w <- data.frame(w) %>% 
+  rename(w = cmsa) %>% 
+  mutate(cmsa = as.numeric(rownames(.)))
+
+df_w_raw <- data.frame(w_raw) %>% 
+  rename(w_raw = cmsa) %>% 
+  mutate(cmsa = as.numeric(rownames(.)))
+
+df_indvi_match_reg <- 
+  df_indvi_match_reg %>% 
+  left_join(.,df_w,by = "cmsa")  %>% 
+  left_join(.,df_w_raw,by = "cmsa")  %>% 
+  cbind(., xb) %>% 
+  cbind(., lhrwage_r)
+
 
 ## WEIGHTED WITH CONTROLS
+
+df_indvi_match_reg <- 
+  df_indvi_match_reg %>% 
+  mutate(wagewt = exp(xb),
+         totwt = perwt*wagewt) %>% 
+  select(-c(xb, wagewt))
+
+reg_weighted <- 
+  feols(lhrwage_r ~ 1 | cmsa,
+        data = df_indvi_match_reg,
+        weights = ~ totwt)
+
+df_w_wt <- 
+  fixef(reg_weighted) %>% 
+  data.frame() %>% 
+  rename(w_wt = cmsa) %>% 
+  mutate(cmsa = as.numeric(rownames(.)))
+
+df_indvi_match_reg <- 
+  left_join(df_indvi_match_reg, df_w_wt, by = "cmsa")
+
+df_indvi_match_reg <- 
+  df_indvi_match_reg %>% 
+  mutate(wagewt = totwt/perwt) %>% 
+  select(w_raw, w, w_wt, wagewt, perwt, cmsa, statefip)
+
+
+# summarize ---------------------------------------------------------------
+
+## COLLASPSE RESIDUALS BY CMSA
+
+df_wage_diff <- 
+  df_indvi_match_reg %>% 
+  group_by(cmsa) %>% 
+  summarise(across(c(w_raw, w, w_wt, wagewt), 
+                   ~weighted.mean(.x, perwt, na.rm = TRUE)), 
+            num_w = n()) %>% 
+  ungroup() %>% 
+  arrange(cmsa)
+
+saveRDS(df_wage_diff, "replication_data/df_wage_diff.rds")
+
+
+
+
+
+
+
+
+
+
+
+
 
 
   
