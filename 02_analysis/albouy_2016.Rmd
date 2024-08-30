@@ -1,0 +1,53 @@
+---
+title: "albouy2016"
+output: html_document
+date: "2024-08-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+pacman::p_load(tidyverse, haven,fastDummies,fixest, plotly)
+
+df <- read_dta("replication_data/stcmsa2000_wacw_albouy.dta")
+```
+
+## Figure 1 
+Housing cost versus wage levels across metro areas, 2000
+
+```{r}
+df <- df %>% 
+  mutate(size = case_when(pop < 500000 ~1,
+                          pop >= 500000 & pop < 1500000 ~2,
+                          pop >= 1500000 & pop < 5000000 ~3,
+                          pop >= 5000000 ~4)) %>% 
+  mutate(size = if_else(str_detect(cmsaname, "Non-metro"), 0, size))
+```
+
+
+```{r}
+figure1 <- 
+  df %>% 
+  distinct(cmsa, .keep_all = T) %>% 
+  ggplot(aes(x = w, y = p, text = shortname)) +
+  geom_point(aes(size = size), alpha = 0.3) +
+  geom_abline(slope = 1.534,intercept = 0)+ 
+  geom_abline(slope = 0.64,intercept = 0,linetype = "dashed")+
+  geom_abline(slope = -7.37,intercept = 0,linetype = "dotted")+
+  geom_abline(slope = -0.02,intercept = 0,linetype = "dotdash")+
+  geom_vline(xintercept = 0)+
+  geom_hline(yintercept = 0)+
+  labs(x="Log Wage Differential(w)",y="Log Housing-Cost Differential(p)")+
+  theme_bw()
+  
+```
+```{r}
+ggplotly(figure1,
+         tooltip = "text")
+```
+
+##記述統計
+
+
