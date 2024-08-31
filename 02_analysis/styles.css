@@ -1,14 +1,24 @@
 /* styles.css */
 body {
   font-size: 20px; /* デフォルトの文字サイズ */
+  background-color: #fefbd8; /* 背景色をクリーム色に設定 */
+  color: #4b3f2d; /* デフォルトの文字色をダークブラウンに設定 */
+  font-family: Arial, sans-serif; /* フォントファミリーを指定 */
 }
 
 h1 {
   font-size: 2em; /* 見出し1の文字サイズ */
+  color: #4b3f2d; /* 見出し1の文字色をダークブラウンに設定 */
 }
 
 h2 {
   font-size: 1.5em; /* 見出し2の文字サイズ */
+  color: #4b3f2d; /* 見出し2の文字色をダークブラウンに設定 */
 }
 
-/* 他のスタイルも追加可能 */
+/* 関数名を強調表示するためのスタイル */
+.function-name {
+  color: #d2691e; /* 関数名の文字色をチョコレート色に設定 */
+  font-weight: bold; /* 太字 */
+  font-style: italic; /* 斜体 */
+}
